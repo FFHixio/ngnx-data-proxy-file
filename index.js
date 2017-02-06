@@ -51,19 +51,14 @@ class FileProxy extends NGN.DATA.Proxy {
        * The type of cipher to use when encrypting/decrypting data at rest.
        * This is only applied if #encryptionKey is provided.
        */
-      cipher: NGN.privateconst(NGN.coalesce(config.cipher, 'aes-256-cbc'))
-    })
-  }
+      cipher: NGN.privateconst(NGN.coalesce(config.cipher, 'aes-256-cbc')),
 
-  /**
-   * @property {string} lockfile
-   * The physical lockfile used to determine whether the file proxy can be
-   * accessed by a new process or not.
-   * @private
-   * @readonly
-   */
-  get lockfile () {
-    return this.dbfile + '.lock'
+      // A proper file locker
+      filelocker: NGN.privateconst(require('proper-lockfile')),
+
+      // A file lock release mechanism (populated dynamically)
+      _release: NGN.private(null)
+    })
   }
 
   /**
@@ -72,21 +67,15 @@ class FileProxy extends NGN.DATA.Proxy {
    * @readonly
    */
   get locked () {
-    return NGN.util.pathReadable(this.lockfile)
-  }
+    let response = false
 
-  /**
-   * @property {string} lockfilepid
-   * The ID of the process that has locked the file.
-   * This will return `None` if no lock is in place.
-   * @readonly
-   */
-  get lockfilepid () {
-    if (!this.locked) {
-      return 'None'
-    }
+    try {
+      response = this.filelocker.checkSync(this.dbfile, {
+        realpath: false
+      })
+    } catch (e) {}
 
-    return require('fs').readFileSync(this.proxy.lockfile).toString().trim()
+    return response
   }
 
   /**
@@ -144,8 +133,10 @@ class FileProxy extends NGN.DATA.Proxy {
    * @private
    */
   lock () {
-    require('fs').writeFileSync(this.lockfile, process.pid, {
-      encoding: 'utf8'
+    this._release = this.filelocker.lockSync(this.dbfile, {
+      stale: 5000,
+      update: 1000,
+      realpath: false
     })
   }
 
@@ -155,7 +146,11 @@ class FileProxy extends NGN.DATA.Proxy {
    * @private
    */
   unlock () {
-    require('fs').unlinkSync(this.lockfile)
+    if (this._release) {
+      this._release()
+    }
+
+    this._release = null
   }
 
   save () {
