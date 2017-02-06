@@ -53,6 +53,14 @@ class FileProxy extends NGN.DATA.Proxy {
        */
       cipher: NGN.privateconst(NGN.coalesce(config.cipher, 'aes-256-cbc')),
 
+      /**
+       * @cfg {boolean} [ignorelocking=false]
+       * Set this to `true` to ignore file locking. This is not recommended
+       * unless the application is using an alternative form of file locking.
+       * If no file locking is used, nothing is preventing file corruption.
+       */
+      ignorelock: NGN.privateconst(NGN.coalesce(config.ignorelocking, false)),
+
       // A proper file locker
       filelocker: NGN.privateconst(require('proper-lockfile')),
 
@@ -67,6 +75,10 @@ class FileProxy extends NGN.DATA.Proxy {
    * @readonly
    */
   get locked () {
+    if (this.ignorelock) {
+      return false
+    }
+
     let response = false
 
     try {
@@ -130,24 +142,40 @@ class FileProxy extends NGN.DATA.Proxy {
   /**
    * @method lock
    * Create a lock file.
+   * @fires filelock
+   * Triggered when a file lock is created on #file.
    * @private
    */
   lock () {
+    if (this.ignorelock) {
+      return
+    }
+
     this._release = this.filelocker.lockSync(this.dbfile, {
       stale: 5000,
       update: 1000,
       realpath: false
     })
+
+    this.emit('filelock')
   }
 
   /**
    * @method unlock
    * Remove a lock file.
+   * @fires fileunlock
+   * Triggered when the #file lock is released.
    * @private
    */
   unlock () {
+    if (this.ignorelock) {
+      return
+    }
+
     if (this._release) {
-      this._release()
+      this._release(() => {
+        this.emit('fileunlock')
+      })
     }
 
     this._release = null
