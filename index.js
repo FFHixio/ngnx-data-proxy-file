@@ -54,12 +54,19 @@ class FileProxy extends NGN.DATA.Proxy {
       cipher: NGN.privateconst(NGN.coalesce(config.cipher, 'aes-256-cbc')),
 
       /**
-       * @cfg {boolean} [ignorelocking=false]
-       * Set this to `true` to ignore file locking. This is not recommended
-       * unless the application is using an alternative form of file locking.
-       * If no file locking is used, nothing is preventing file corruption.
+       * @cfgproperty {boolean} [autolock=true]
+       * Automatically control the lock file when saving to disk. This will lock
+       * the file before a write/save and unlock it when the write/save
+       * operation is complete.
+       *
+       * For manual control, set this to `false`. When autolock is disabled, the
+       * #lock and #unlock methods are **not** executed automatically on a
+       * write/save. In this case, the methods must be called manually. For most
+       * scenarios, this is unnecessary. However; if a an application must block
+       * access to the file even when it is not writing to disk, autolock can
+       * be disabled and locking can be implemented manually.
        */
-      ignorelock: NGN.privateconst(NGN.coalesce(config.ignorelocking, false)),
+      _autolock: NGN.privateconst(NGN.coalesce(config.autolock, true)),
 
       // A proper file locker
       filelocker: NGN.privateconst(require('proper-lockfile')),
@@ -69,16 +76,25 @@ class FileProxy extends NGN.DATA.Proxy {
     })
   }
 
+  get autolock () {
+    return this._autolock
+  }
+
+  set autolock (value) {
+    if (typeof value !== 'boolean') {
+      console.warn('Cannot set autolock to a non-boolean value (received ' + (typeof value) + ')')
+      return
+    }
+
+    this._autolock = value
+  }
+
   /**
    * @property {boolean} locked
    * Indicates the file is locked by a process.
    * @readonly
    */
   get locked () {
-    if (this.ignorelock) {
-      return false
-    }
-
     let response = false
 
     try {
@@ -147,10 +163,6 @@ class FileProxy extends NGN.DATA.Proxy {
    * @private
    */
   lock () {
-    if (this.ignorelock) {
-      return
-    }
-
     this._release = this.filelocker.lockSync(this.dbfile, {
       stale: 5000,
       update: 1000,
@@ -168,10 +180,6 @@ class FileProxy extends NGN.DATA.Proxy {
    * @private
    */
   unlock () {
-    if (this.ignorelock) {
-      return
-    }
-
     if (this._release) {
       this._release(() => {
         this.emit('fileunlock')
@@ -198,9 +206,6 @@ class FileProxy extends NGN.DATA.Proxy {
 
     // Create the output directory if it doesn't already exist.
     this.mkdirp(require('path').dirname(this.dbfile))
-
-    // Create a lock file
-    this.lock()
   }
 
   /**
@@ -211,9 +216,6 @@ class FileProxy extends NGN.DATA.Proxy {
    * @private
    */
   postsave (callback) {
-    // Unlock
-    this.unlock()
-
     this.emit('save')
     this.store.emit('save')
 
@@ -252,6 +254,12 @@ class FileProxy extends NGN.DATA.Proxy {
    * @private
    */
   writeToDisk (content, encryptdata = true) {
+    // If autolock is enabled and the file isn't already
+    // locked, lock it.
+    if (this._autolock && !this.locked) {
+      this.lock()
+    }
+
     // Optionally encrypt data
     if (encryptdata && this.munge) {
       content = this.encrypt(content)
@@ -261,6 +269,11 @@ class FileProxy extends NGN.DATA.Proxy {
     require('fs').writeFileSync(this.dbfile, content, {
       encoding: 'utf8'
     })
+
+    // If autolock is enabled and the file is locked, unlock it.
+    if (this._autolock && this.locked) {
+      this.unlock()
+    }
   }
 
   /**
