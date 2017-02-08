@@ -313,8 +313,6 @@ class FileProxy extends NGN.DATA.Proxy {
 
     // Store the release mechanism
     this._release = this.filelocker.lockSync(this.dbfile, {
-      stale: 5000,
-      update: 1000,
       realpath: false
     })
 
