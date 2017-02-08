@@ -35,7 +35,7 @@ class FileProxy extends NGN.DATA.Proxy {
        * @cfg {string} file
        * Path to the JSON file.
        */
-      dbfile: NGN.const(config.file),
+      dbfile: NGN.private(config.file),
 
       /**
        * @cfg {string} [encryptionKey=null]
@@ -68,12 +68,29 @@ class FileProxy extends NGN.DATA.Proxy {
        */
       _autolock: NGN.privateconst(NGN.coalesce(config.autolock, true)),
 
+      /**
+       * @cfg {boolean} [hideLockedFile=true]
+       * By default, a file is hidden when it is locked (the hidden flag is
+       * updated on the operating system). This behavior can be disabled by
+       * setting this to `false`.
+       */
+      hidelock: NGN.private(NGN.coalesce(config.hideLockedFile, true)),
+
       // A proper file locker
       filelocker: NGN.privateconst(require('proper-lockfile')),
 
       // A file lock release mechanism (populated dynamically)
-      _release: NGN.private(null)
+      _release: NGN.private(null),
+
+      // A placeholder to determine if this process created the lockfile.
+      _lockowner: NGN.private(false),
+
+      _exec: NGN.privateconst(require('child_process').execSync)
     })
+  }
+
+  get os () {
+    return require('os').platform()
   }
 
   get autolock () {
@@ -104,6 +121,10 @@ class FileProxy extends NGN.DATA.Proxy {
     } catch (e) {}
 
     return response
+  }
+
+  get isLockOwner () {
+    return this._lockowner
   }
 
   /**
@@ -156,6 +177,129 @@ class FileProxy extends NGN.DATA.Proxy {
   }
 
   /**
+   * @method hide
+   * Hide the specified file or directory. In Linux/Unix environments,
+   * hiding a file requires renaming it to begin with a `.`, such as
+   * `.myfile.json`. This is handled automatically by this method. On
+   * Windows and macOS, a flag is used to mark the file as hidden, but no
+   * change is made to the filename/path.
+   * @param {String} absolutePath
+   * The absolute path of the file or directory to hide.
+   * @private
+   */
+  hide (absolutePath) {
+    if (!NGN.util.pathReadable(absolutePath)) {
+      console.warn('Cannot hide ' + absolutePath + ' (does not exist or cannot be found)')
+      return
+    }
+
+    switch (this.os) {
+      // macOS support using chflags
+      case 'darwin':
+        this._exec('chflags hidden \"' + absolutePath + '\"')
+        return
+
+      case 'win32':
+        this._exec('attrib +h \"' + absolutePath + '\"')
+        return
+
+      default:
+        let asset = require('path').basename(this.dbfile)
+
+        if (asset.substr(0, 1) === '.') {
+          return
+        }
+
+        let newFilepath = this.dbfile.replace(asset, '.' + asset)
+
+        require('fs').renameSync(this.dbfile, newFilepath)
+        this.dbfile = newFilepath
+        return
+    }
+  }
+
+  /**
+   * @method unhide
+   * Make the specified file or directory visible in the OS.
+   * @param {String} absolutePath
+   * The absolute path of the file or directory to show.
+   * @private
+   */
+  unhide (absolutePath) {
+    if (!NGN.util.pathReadable(absolutePath)) {
+      console.warn('Cannot hide ' + absolutePath + ' (does not exist or cannot be found)')
+      return
+    }
+
+    switch (this.os) {
+      // macOS support using chflags
+      case 'darwin':
+        this._exec('chflags nohidden \"' + absolutePath + '\"')
+        return
+
+      case 'win32':
+        this._exec('attrib -h \"' + absolutePath + '\"')
+        return
+
+      default:
+        let asset = require('path').basename(this.dbfile)
+
+        if (asset.substr(0, 1) !== '.') {
+          return
+        }
+
+        let newFilepath = this.dbfile.replace(asset, asset.substr(1, asset.length))
+
+        require('fs').renameSync(this.dbfile, newFilepath)
+        this.dbfile = newFilepath
+        return
+    }
+  }
+
+  /**
+   * @method denyWrite
+   * Make the #file read-only for all processes except this one.
+   * In other words, only this process can write to the file.
+   * @private
+   */
+  denyWrite () {
+    if (!NGN.util.pathWritable(this.dbfile)) {
+      return
+    }
+
+    switch (this.os) {
+      case 'win32':
+        this._exec('attrib +r \"' + this.dbfile + '\"')
+        return
+
+      default:
+        require('fs').chmodSync(this.dbfile, 600)
+        return
+    }
+  }
+
+  /**
+   * @method allowWrite
+   * Allow other processes to write to #file.
+   * @private
+   */
+  allowWrite () {
+    if (NGN.util.pathWritable(this.dbfile)) {
+      return
+    }
+
+    switch (this.os) {
+      case 'win32':
+        this._exec('attrib -r \"' + this.dbfile + '\"')
+        return
+
+      default:
+        require('fs').chmodSync(this.dbfile, 666)
+        return
+    }
+  }
+
+  /**
    * @method lock
    * Create a lock file.
    * @fires filelock
@@ -163,11 +307,24 @@ class FileProxy extends NGN.DATA.Proxy {
    * @private
    */
   lock () {
+    if (this.locked) {
+      return
+    }
+
+    // Store the release mechanism
     this._release = this.filelocker.lockSync(this.dbfile, {
       stale: 5000,
       update: 1000,
       realpath: false
     })
+
+    // Identify this process as the lock owner.
+    this._lockowner = true
+
+    // Hide the locked file.
+    if (this.hidelock) {
+      this.hide(this.dbfile)
+    }
 
     this.emit('filelock')
   }
@@ -180,6 +337,15 @@ class FileProxy extends NGN.DATA.Proxy {
    * @private
    */
   unlock () {
+    if (!this.locked) {
+      return
+    }
+
+    if (!this.isLockOwner) {
+      console.warn('Cannot unlock (this process does not own the lockfile.)')
+      return
+    }
+
     if (this._release) {
       this._release(() => {
         this.emit('fileunlock')
