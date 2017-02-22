@@ -319,15 +319,32 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
    * @method presave
    * Checks to assure the file can be accessed (i.e. not locked) and assures
    * the filepath is accessible (mkdirp). Automatically locks the file.
+   * @returns {boolean}
+   * Returns `true` if the save process should continue, `false`if it should not.
    * @private
    */
   presave () {
     if (this.locked) {
-      throw new Error('Process ID ' + this.proxy.lockfilepid + ' has a lock on ' + this.dbfile + '. Cannot save.')
+      throw new Error(this.dbfile + ' is locked by another process. Cannot save.')
+    }
+
+    if (this.type === 'model' && this.store.proxyignore) {
+      return false
+    }
+
+    if (this.type === 'store') {
+      this.store.addFilter(this.proxyRecordFilter)
+      this.store.applyFilters()
+
+      if (this.store.records.length === 0) {
+        return false
+      }
     }
 
     // Create the output directory if it doesn't already exist.
     this.mkdirp(require('path').dirname(this.dbfile))
+
+    return true
   }
 
   /**
@@ -395,6 +412,83 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
     }
 
     return content
+  }
+
+  /**
+   * @method createModelRecord
+   * Saves the data to the #file.
+   * @private
+   */
+  createModelRecord () {
+    this.saveAndEmit('live.create').apply(this, arguments)
+  }
+
+  /**
+   * @method updateModelRecord
+   * Saves the data to the #file.
+   * @private
+   */
+  updateModelRecord () {
+    this.saveAndEmit('live.update').apply(this, arguments)
+  }
+
+  /**
+   * @method deleteModelRecord
+   * Saves the data to the #file.
+   * @private
+   */
+  deleteModelRecord () {
+    this.saveAndEmit('live.delete').apply(this, arguments)
+  }
+
+  /**
+   * @method createStoreRecord
+   * Saves the data to the #file.
+   * @private
+   */
+  createStoreRecord () {
+    this.saveAndEmit('live.create').apply(this, arguments)
+  }
+
+  /**
+   * @method updateStoreRecord
+   * Saves the data to the #file.
+   * @private
+   */
+  updateStoreRecord () {
+    this.saveAndEmit('live.update').apply(this, arguments)
+  }
+
+  /**
+   * @method deleteStoreRecord
+   * Saves the data to the #file.
+   * @private
+   */
+  deleteStoreRecord () {
+    this.saveAndEmit('live.delete').apply(this, arguments)
+  }
+
+  /**
+   * @method clearStoreRecords
+   * Clears the data in the #file.
+   * @private
+   */
+  clearStoreRecords () {
+    this.saveAndEmit('live.delete').apply(this, arguments)
+  }
+
+  /**
+   * @method saveAndEmit
+   * A helper method to automatically save and emit an event upon completion.
+   * @private
+   */
+  saveAndEmit (eventName) {
+    return (record) => {
+      this.save(() => {
+        this.emit(eventName, record || null)
+        this.store.emit(eventName, record || null)
+      })
+    }
   }
 }
 
