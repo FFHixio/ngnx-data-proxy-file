@@ -334,9 +334,9 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
 
     if (this.type === 'store') {
       this.store.addFilter(this.proxyRecordFilter)
-      this.store.applyFilters()
 
       if (this.store.records.length === 0) {
+        this.store.removeFilter(this.proxyRecordFilter)
         return false
       }
     }
