@@ -334,11 +334,6 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
 
     if (this.type === 'store') {
       this.store.addFilter(this.proxyRecordFilter)
-
-      if (this.store.records.length === 0) {
-        this.store.removeFilter(this.proxyRecordFilter)
-        return false
-      }
     }
 
     // Create the output directory if it doesn't already exist.
@@ -420,7 +415,7 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
    * @private
    */
   createModelRecord () {
-    this.saveAndEmit('live.create').apply(this, arguments)
+    this.proxy.saveAndEmit('live.create').apply(this, arguments)
   }
 
   /**
@@ -429,7 +424,7 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
    * @private
    */
   updateModelRecord () {
-    this.saveAndEmit('live.update').apply(this, arguments)
+    this.proxy.saveAndEmit('live.update').apply(this, arguments)
   }
 
   /**
@@ -438,7 +433,7 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
    * @private
    */
   deleteModelRecord () {
-    this.saveAndEmit('live.delete').apply(this, arguments)
+    this.proxy.saveAndEmit('live.delete').apply(this, arguments)
   }
 
   /**
@@ -447,7 +442,7 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
    * @private
    */
   createStoreRecord () {
-    this.saveAndEmit('live.create').apply(this, arguments)
+    this.proxy.saveAndEmit('live.create').apply(this, arguments)
   }
 
   /**
@@ -456,7 +451,7 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
    * @private
    */
   updateStoreRecord () {
-    this.saveAndEmit('live.update').apply(this, arguments)
+    this.proxy.saveAndEmit('live.update').apply(this, arguments)
   }
 
   /**
@@ -465,7 +460,7 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
    * @private
    */
   deleteStoreRecord () {
-    this.saveAndEmit('live.delete').apply(this, arguments)
+    this.proxy.saveAndEmit('live.delete').apply(this, arguments)
   }
 
   /**
@@ -474,7 +469,7 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
    * @private
    */
   clearStoreRecords () {
-    this.saveAndEmit('live.delete').apply(this, arguments)
+    this.proxy.saveAndEmit('live.delete').apply(this, arguments)
   }
 
   /**
@@ -485,6 +480,7 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
   saveAndEmit (eventName) {
     return (record) => {
       this.save(() => {
+        console.log('saved')
         this.emit(eventName, record || null)
         this.store.emit(eventName, record || null)
       })
