@@ -480,7 +480,6 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
   saveAndEmit (eventName) {
     return (record) => {
       this.save(() => {
-        console.log('saved')
         this.emit(eventName, record || null)
         this.store.emit(eventName, record || null)
       })
