@@ -98,15 +98,13 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
    * @readonly
    */
   get locked () {
-    let response = false
-
     try {
-      response = this.filelocker.checkSync(this.dbfile, {
+      return this.filelocker.checkSync(this.dbfile, {
         realpath: false
       })
-    } catch (e) {}
-
-    return response
+    } catch (e) {
+      return false
+    }
   }
 
   get isLockOwner () {
@@ -271,7 +269,9 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
 
     // Store the release mechanism
     this._release = this.filelocker.lockSync(this.dbfile, {
-      realpath: false
+      realpath: false,
+      stale: 5000,
+      update: 2000
     })
 
     // Identify this process as the lock owner.
@@ -355,7 +355,7 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
   writeToDisk (content, encryptdata = true) {
     // If autolock is enabled and the file isn't already
     // locked, lock it.
-    if (this._autolock && !this.locked) {
+    if (this._autolock) {
       this.lock()
     }
 
