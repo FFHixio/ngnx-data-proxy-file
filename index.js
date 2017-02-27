@@ -324,7 +324,7 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
    * @private
    */
   presave () {
-    if (this.locked) {
+    if (this.locked && !this.isLockOwner) {
       throw new Error(this.dbfile + ' is locked by another process. Cannot save.')
     }
 

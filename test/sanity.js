@@ -86,8 +86,15 @@ test('Lockfile Settings', function (t) {
     autolock: false
   })
 
-  t.ok(!m.proxy.locked, 'Disabling autolock results in an "unlocked" state.')
-  t.ok(!m.proxy.isLockOwner, 'Disabling autolock results in the process NOT identifying itself as the lock owner.')
+  let NewModel = new NGN.DATA.Model(m)
+  let record = new NewModel({
+    firstname: 'The',
+    lastname: 'Doctor'
+  })
+
+  t.ok(!record.proxy.locked, 'Disabling autolock results in an "unlocked" state.')
+  t.ok(!record.proxy.isLockOwner, 'Disabling autolock results in the process NOT identifying itself as the lock owner.')
+  t.ok(record.proxy.presave(), 'Presave does not block on lock.')
 
   t.end()
 })
