@@ -23,7 +23,7 @@
   },
   "homepage": "https://github.com/ngnjs/ngnx-data-proxy-file#readme",
   "dependencies": {
-    "ngnx-data-proxy-database": "^1.0.2",
+    "ngnx-data-proxy-database": "^1.0.3",
     "proper-lockfile": "^2.0.0"
   },
   "devDependencies": {
