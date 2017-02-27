@@ -1,6 +1,6 @@
 {
   "name": "ngnx-data-proxy-file",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "description": "A generic class for persisting data to disk. Edit",
   "main": "index.js",
   "scripts": {
