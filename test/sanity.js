@@ -9,6 +9,7 @@ require('ngn-data')
 require('../')
 
 let root = require('path').join(__dirname, './data/db.txt')
+let root2 = require('path').join(__dirname, './data/db_2.txt')
 
 fse.emptyDirSync(path.dirname(root))
 
@@ -96,5 +97,31 @@ test('Lockfile Settings', function (t) {
   t.ok(!record.proxy.isLockOwner, 'Disabling autolock results in the process NOT identifying itself as the lock owner.')
   t.ok(record.proxy.presave(), 'Presave does not block on lock.')
 
-  t.end()
+  let m2 = meta()
+  m2.proxy = new NGNX.DATA.FileProxy({
+    file: root2,
+    autolock: false
+  })
+
+  let record2 = new NewModel({
+    firstname: 'The',
+    lastname: 'Master'
+  })
+
+  try {
+    record2.proxy.lock()
+    t.ok(record2.proxy.locked, 'Locking a file that does not exist yet touches the file and creates the lock.')
+
+    record2.proxy.unlock()
+
+    fse.removeSync(root2)
+
+    if (NGN.util.pathExists(root2)) {
+      throw new Error(`Could not remove "${root2}". The test did not clean up properly and this file may need to be removed manually.`)
+    }
+
+    t.end()
+  } catch (e) {
+    t.fail(e.message)
+  }
 })

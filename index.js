@@ -267,6 +267,10 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
       return
     }
 
+    if (!NGN.util.pathExists(this.dbfile)) {
+      require('touch').sync(this.dbfile)
+    }
+
     // Store the release mechanism
     this._release = this.filelocker.lockSync(this.dbfile, {
       realpath: false,
