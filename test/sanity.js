@@ -114,8 +114,6 @@ test('Lockfile Settings', function (t) {
 
     record2.proxy.unlock()
 
-    fse.removeSync(root2)
-
     if (NGN.util.pathExists(root2)) {
       throw new Error(`Could not remove "${root2}". The test did not clean up properly and this file may need to be removed manually.`)
     }
@@ -124,4 +122,35 @@ test('Lockfile Settings', function (t) {
   } catch (e) {
     t.fail(e.message)
   }
+})
+
+test('Lockfile Keepalive', {
+  timeout: 20000
+}, function (t) {
+  console.log('This test measures expiration time. It may take up to 15 seconds to complete (average 6.5s, times out after 20s).')
+
+  let m = meta()
+  m.proxy = new NGNX.DATA.FileProxy({
+    file: root,
+    autolock: false,
+    stale: 5000
+  })
+
+  let NewModel = new NGN.DATA.Model(m)
+  let record = new NewModel({
+    firstname: 'The',
+    lastname: 'Doctor'
+  })
+
+  record.proxy.lock()
+
+  setTimeout(() => {
+    t.ok(record.proxy.locked, 'Record is still locked after staleness expiration.')
+
+    record.proxy.on('file.unlock', () => t.end())
+
+    record.proxy.unlock()
+
+    record.proxy.on('lock.compromised', () => t.fail('Lock compromised.'))
+  }, 6000)
 })

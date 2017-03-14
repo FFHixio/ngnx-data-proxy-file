@@ -62,6 +62,13 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
        */
       hidelock: NGN.private(NGN.coalesce(config.hideLockedFile, true)),
 
+      /**
+       * @cfg {number} [stale=10000]
+       * The amount of time (milliseconds) before a lock is considered stale.
+       * The minimum is 10000 (10 seconds).
+       */
+      staleness: NGN.private(NGN.coalesce(config.stale, 10000)),
+
       // A proper file locker
       filelocker: NGN.privateconst(require('proper-lockfile')),
 
@@ -71,8 +78,20 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
       // A placeholder to determine if this process created the lockfile.
       _lockowner: NGN.private(false),
 
-      _exec: NGN.privateconst(require('child_process').execSync)
+      _exec: NGN.privateconst(require('child_process').execSync),
+
+      // Placeholder to determine if a file does not exist.
+      _dne: NGN.private(false)
     })
+
+    // Force staleness to a minimum of 5000.
+    if (this.staleness < 5000) {
+      this.staleness = 5000
+    }
+
+    process
+      .once('SIGINT', () => process.exit(1))
+      .once('SIGTERM', () => process.exit(1))
   }
 
   get os () {
@@ -109,6 +128,19 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
 
   get isLockOwner () {
     return this._lockowner
+  }
+
+  /**
+   * @method touch
+   * Similar to the Unix `touch` command, this makes sure the
+   * #file exists before locking or writing to it.
+   */
+  touch () {
+    if (!NGN.util.pathExists(this.dbfile)) {
+      this._dne = true
+      this.mkdirp(require('path').dirname(this.dbfile))
+      require('fs').closeSync(require('fs').openSync(this.dbfile, 'a'))
+    }
   }
 
   /**
@@ -267,15 +299,15 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
       return
     }
 
-    if (!NGN.util.pathExists(this.dbfile)) {
-      require('touch').sync(this.dbfile)
-    }
+    this.touch()
 
     // Store the release mechanism
     this._release = this.filelocker.lockSync(this.dbfile, {
       realpath: false,
-      stale: 5000,
-      update: 2000
+      stale: this.staleness,
+      update: (this.staleness / 3) > 1000 ? (this.staleness / 3) : 1000
+    }, () => {
+      this.emit('lock.compromised')
     })
 
     // Identify this process as the lock owner.
@@ -286,7 +318,7 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
       this.hide(this.dbfile)
     }
 
-    this.emit('filelock')
+    this.emit('file.lock')
   }
 
   /**
@@ -308,7 +340,13 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
 
     if (this._release) {
       this._release(() => {
-        this.emit('fileunlock')
+        if (this._dne && require('fs').statSync(this.dbfile).size === 0) {
+          require('fs').unlinkSync(this.dbfile)
+        }
+
+        this._dne = false
+
+        this.emit('file.unlock')
       })
     }
 
@@ -340,8 +378,7 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
       this.store.addFilter(this.proxyRecordFilter)
     }
 
-    // Create the output directory if it doesn't already exist.
-    this.mkdirp(require('path').dirname(this.dbfile))
+    this.touch()
 
     return true
   }
