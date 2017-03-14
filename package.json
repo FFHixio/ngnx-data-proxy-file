@@ -1,6 +1,6 @@
 {
   "name": "ngnx-data-proxy-file",
-  "version": "1.0.16",
+  "version": "1.0.17",
   "description": "A generic class for persisting data to disk. Edit",
   "main": "index.js",
   "scripts": {
@@ -24,8 +24,7 @@
   "homepage": "https://github.com/ngnjs/ngnx-data-proxy-file#readme",
   "dependencies": {
     "ngnx-data-proxy-database": "^1.0.4",
-    "proper-lockfile": "^2.0.0",
-    "touch": "^1.0.0"
+    "proper-lockfile": "^2.0.0"
   },
   "devDependencies": {
     "babel-eslint": "^7.1.1",
