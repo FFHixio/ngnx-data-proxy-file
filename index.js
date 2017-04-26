@@ -184,11 +184,11 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
     switch (this.os) {
       // macOS support using chflags
       case 'darwin':
-        this._exec('chflags hidden \"' + absolutePath + '\"')
+        this._exec('chflags hidden "' + absolutePath + '"')
         return
 
       case 'win32':
-        this._exec('attrib +h \"' + absolutePath + '\"')
+        this._exec('attrib +h "' + absolutePath + '"')
         return
 
       default:
@@ -202,7 +202,6 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
 
         require('fs').renameSync(this.dbfile, newFilepath)
         this.dbfile = newFilepath
-        return
     }
   }
 
@@ -222,11 +221,11 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
     switch (this.os) {
       // macOS support using chflags
       case 'darwin':
-        this._exec('chflags nohidden \"' + absolutePath + '\"')
+        this._exec('chflags nohidden "' + absolutePath + '"')
         return
 
       case 'win32':
-        this._exec('attrib -h \"' + absolutePath + '\"')
+        this._exec('attrib -h "' + absolutePath + '"')
         return
 
       default:
@@ -240,7 +239,6 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
 
         require('fs').renameSync(this.dbfile, newFilepath)
         this.dbfile = newFilepath
-        return
     }
   }
 
@@ -257,12 +255,11 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
 
     switch (this.os) {
       case 'win32':
-        this._exec('attrib +r \"' + this.dbfile + '\"')
+        this._exec('attrib +r "' + this.dbfile + '"')
         return
 
       default:
         require('fs').chmodSync(this.dbfile, 600)
-        return
     }
   }
 
@@ -278,12 +275,11 @@ class FileProxy extends NGNX.DATA.DatabaseProxy {
 
     switch (this.os) {
       case 'win32':
-        this._exec('attrib -r \"' + this.dbfile + '\"')
+        this._exec('attrib -r "' + this.dbfile + '"')
         return
 
       default:
         require('fs').chmodSync(this.dbfile, 666)
-        return
     }
   }
 
