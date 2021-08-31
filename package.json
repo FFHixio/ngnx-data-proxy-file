@@ -4,7 +4,9 @@
   "description": "A generic class for persisting data to disk. Edit",
   "main": "index.js",
   "scripts": {
-    "test": "tape test/**/*.js | tap-spec && standard | snazzy --verbose"
+    "test": "tape test/**/*.js | tap-spec && standard | snazzy --verbose",
+    "prepublish": "npm run snyk-protect",
+    "snyk-protect": "snyk-protect"
   },
   "repository": {
     "type": "git",
@@ -24,7 +26,8 @@
   "homepage": "https://github.com/ngnjs/ngnx-data-proxy-file#readme",
   "dependencies": {
     "ngnx-data-proxy-database": "^1.0.8",
-    "proper-lockfile": "^2.0.1"
+    "proper-lockfile": "^2.0.1",
+    "@snyk/protect": "latest"
   },
   "devDependencies": {
     "babel-eslint": "^7.2.3",
@@ -54,5 +57,6 @@
       "LoggingMethodError",
       "DuplicateLoggingMethodError"
     ]
-  }
+  },
+  "snyk": true
 }
